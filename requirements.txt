@@ -1,2 +1,6 @@
 flask
 aws-lambda-wsgi
+flask-sqlalchemy>=3.0.0
+flask-migrate>=4.0.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.0
