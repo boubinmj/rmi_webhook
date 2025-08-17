@@ -17,3 +17,33 @@ def appointment():
             }]
         }
     })
+
+@app.route('/firstName', methods=['GET'])
+def firstName():
+    # Get the parameter from query string (?input=...)
+    user_input = request.args.get('input')
+    
+    if not user_input:
+        return jsonify({"error": "Missing first name"}), 400
+    
+    return jsonify({"you_sent": user_input})
+
+@app.route('/lastName', methods=['GET'])
+def lastName():
+    # Get the parameter from query string (?input=...)
+    user_input = request.args.get('input')
+    
+    if not user_input:
+        return jsonify({"error": "Missing Last Name"}), 400
+    
+    return jsonify({"you_sent": user_input})
+
+@app.route('/email', methods=['GET'])
+def email():
+    # Get the parameter from query string (?input=...)
+    user_input = request.args.get('input')
+    
+    if not user_input:
+        return jsonify({"error": "Missing email"}), 400
+    
+    return jsonify({"you_sent": user_input})
