@@ -7,7 +7,7 @@ def lambda_handler(event, context):
     # For AWS API Gateway
     headers.setdefault("X-Forwarded-Proto", "https")
 
-    # set API headers and params
+    # set API headers and params 
     headers.setdefault("Host", "example.com")
     event["headers"] = headers
     return response(app, event, context)

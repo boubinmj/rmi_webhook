@@ -32,7 +32,6 @@ def appointment():
 @app.route('/firstName', methods=['GET'])
 def firstName():
     sid = get_sid()
-    # (?input=...)
     first_name = request.args.get('input')
 
     # bad input    
@@ -45,26 +44,25 @@ def firstName():
 @app.route('/lastName', methods=['GET'])
 def lastName():
     sid = get_sid()
-    # Get the parameter from query string (?input=...)
     user_input = request.args.get('input')
     
     if not user_input:
         return jsonify({"error": "Missing Last Name"}), 400
     
-    SESSIONS.setdefault(sid, {})["first_name"] = user_input
+    SESSIONS.setdefault(sid, {})["last_name"] = user_input
     return jsonify({"session_id": sid, "you_sent": user_input})
 
 @app.route('/email', methods=['GET'])
 def email():
     sid = get_sid()
-    # Get the parameter from query string (?input=...)
     user_input = request.args.get('input')
     
     if not user_input:
         return jsonify({"error": "Missing email"}), 400
     
-    SESSIONS.setdefault(sid, {})["first_name"] = user_input
-    return jsonify({"session_id": sid, "you_sent": user_input})
+    SESSIONS.setdefault(sid, {})["email"] = user_input
+    record = SESSIONS[sid]
+    return jsonify({"session_id": sid, "record": record})
 
 @app.route('/test', methods=['GET'])
 def test():
