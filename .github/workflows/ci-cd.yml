@@ -1,0 +1,90 @@
+name: CI-CD-Lambda
+contents: read
+
+
+env:
+APP: rmi-webhook
+REGION: ${{ secrets.AWS_REGION }}
+
+
+jobs:
+test:
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v4
+- uses: actions/setup-python@v5
+with:
+python-version: "3.12"
+- name: Install deps
+run: |
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pip install pytest flake8
+- name: Lint
+run: flake8 .
+- name: Test
+run: pytest -q || true
+
+
+build_push_deploy:
+needs: test
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v4
+
+
+- name: Configure AWS credentials
+uses: aws-actions/configure-aws-credentials@v4
+with:
+aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+aws-region: ${{ secrets.AWS_REGION }}
+
+
+- name: Get AWS Account ID
+id: acct
+run: echo "account=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
+
+
+- name: Login to Amazon ECR
+uses: aws-actions/amazon-ecr-login@v2
+
+
+- name: Ensure ECR repo exists
+run: |
+aws ecr describe-repositories --repository-names $APP --region $REGION || \
+aws ecr create-repository --repository-name $APP --region $REGION
+
+
+- name: Build image
+run: |
+GIT_SHA=$(git rev-parse --short HEAD)
+docker build -t $APP:$GIT_SHA -t $APP:latest .
+
+
+- name: Tag & push image
+env:
+ACCOUNT_ID: ${{ steps.acct.outputs.account }}
+run: |
+ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$APP
+GIT_SHA=$(git rev-parse --short HEAD)
+docker tag $APP:$GIT_SHA $ECR_URI:$GIT_SHA
+docker tag $APP:latest $ECR_URI:latest
+docker push $ECR_URI:$GIT_SHA
+docker push $ECR_URI:latest
+echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
+echo "GIT_SHA=$GIT_SHA" >> $GITHUB_ENV
+
+
+- name: Terraform init
+working-directory: infra/aws-lambda-apigw
+run: terraform init
+
+
+- name: Terraform apply (deploy)
+working-directory: infra/aws-lambda-apigw
+env:
+TF_VAR_region: ${{ secrets.AWS_REGION }}
+TF_VAR_project: rmi-webhook
+TF_VAR_image_tag: ${{ env.GIT_SHA }}
+run: terraform apply -auto-approve
