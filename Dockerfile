@@ -1,27 +1,30 @@
-# Use AWS Lambda Python base image (runtime interface client baked in)
-FROM public.ecr.aws/lambda/python:3.12 AS runtime
-
-
-# Add AWS Lambda Web Adapter (so Flask WSGI can run on Lambda without code changes)
-# Docs: https://github.com/awslabs/aws-lambda-web-adapter
-# The adapter provides a bootstrap that translates API Gateway/ALB events to HTTP.
-ADD https://github.com/awslabs/aws-lambda-web-adapter/releases/latest/download/aws-lambda-adapter.zip /opt/extensions/
-RUN cd /opt/extensions && unzip aws-lambda-adapter.zip && rm aws-lambda-adapter.zip
-
-
-# App code and dependencies
+# Dockerfile (Lambda + Web Adapter) — robust
+FROM public.ecr.aws/docker/library/python:3.12-slim AS base
 WORKDIR /var/task
-COPY requirements.txt ./
+
+# 1) Copy the Lambda Web Adapter binary from ECR (pin a version)
+FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS adapter
+# (no commands; we just need /lambda-adapter from this stage)
+
+# 2) Your runtime image
+FROM public.ecr.aws/docker/library/python:3.12-slim
+WORKDIR /var/task
+
+# Minimal system deps (optional)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# App deps
+COPY requirements.txt .
 RUN python -m pip install --upgrade pip && pip install -r requirements.txt
+
+# App code
 COPY . .
 
+# Copy the adapter binary into the Lambda extensions folder
+COPY --from=adapter /lambda-adapter /opt/extensions/lambda-adapter
 
-# The Lambda Web Adapter requires your web server to bind to 0.0.0.0:$PORT
-# Flask dev server is fine for light workloads; for heavier ones, install gunicorn
+# Web server settings
 ENV PORT=8080
 
-
-# Command to start the web server inside Lambda environment
-# Use Flask's built-in server for simplicity; swap to gunicorn for prod if needed
-# Example gunicorn: gunicorn -b 0.0.0.0:$PORT app:app
-CMD ["python", "-c", "from app import app; app.run(host='0.0.0.0', port=8080)" ]
+# Start your Flask app (the adapter forwards API GW events to this HTTP server)
+CMD ["python", "-c", "from app import app; app.run(host='0.0.0.0', port=8080)"]
