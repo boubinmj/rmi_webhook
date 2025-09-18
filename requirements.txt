@@ -1,5 +1,6 @@
 flask
-aws-lambda-wsgi
+gunicorn==22.0.0
+aws-wsgi==0.2.7
 flask-sqlalchemy>=3.0.0
 flask-migrate>=4.0.0
 python-dotenv>=1.0.0

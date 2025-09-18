@@ -1,30 +1,42 @@
-# Dockerfile (Lambda + Web Adapter) — robust
-FROM public.ecr.aws/docker/library/python:3.12-slim AS base
-WORKDIR /var/task
+# syntax=docker/dockerfile:1
 
-# 1) Copy the Lambda Web Adapter binary from ECR (pin a version)
-FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 AS adapter
-# (no commands; we just need /lambda-adapter from this stage)
-
-# 2) Your runtime image
-FROM public.ecr.aws/docker/library/python:3.12-slim
-WORKDIR /var/task
-
-# Minimal system deps (optional)
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# App deps
+############################
+# Common base (deps build) #
+############################
+FROM python:3.12-slim AS deps
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && \
+    rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
-RUN python -m pip install --upgrade pip && pip install -r requirements.txt
-
-# App code
+RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# Copy the adapter binary into the Lambda extensions folder
-COPY --from=adapter /lambda-adapter /opt/extensions/lambda-adapter
+###############
+# Target: web #
+###############
+FROM python:3.12-slim AS web
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY --from=deps /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=deps /usr/local/bin /usr/local/bin
+COPY --from=deps /app /app
+EXPOSE 8000
+# Serve Flask via Gunicorn
+CMD ["gunicorn", "-w", "2", "-k", "gthread", "-b", "0.0.0.0:8000", "app:app"]
 
-# Web server settings
-ENV PORT=8080
-
-# Start your Flask app (the adapter forwards API GW events to this HTTP server)
-CMD ["python", "-c", "from app import app; app.run(host='0.0.0.0', port=8080)"]
+#################
+# Target: lambda#
+#################
+# AWS Lambda Python base image for container functions
+FROM public.ecr.aws/lambda/python:3.12 AS lambda
+# Copy installed deps & app code
+COPY --from=deps /var/lang /var/lang
+COPY --from=deps /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=deps /usr/local/bin /usr/local/bin
+COPY --from=deps /app /var/task
+# The Lambda base image already sets the ENTRYPOINT.
+# We just need to specify the handler as CMD:
+CMD ["lambda_handler.lambda_handler"]
