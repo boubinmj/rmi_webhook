@@ -1,1 +1,5 @@
 .github/workflows/ci-cd.yml
+venv/
+.evn/
+__pycache__/
+*.pyc

@@ -1,0 +1,22 @@
+services:
+  web:
+    build: .
+    container_name: flask-web
+    # Your Dockerfile's CMD is `python app.py`, which already runs the server.
+    # If you ever want to override: uncomment the next line.
+    # command: python app.py
+    ports:
+      - "5000:5000"
+    environment:
+      # Flask binds to 0.0.0.0 in your app.py, so port mapping works.
+      - PORT=5000
+      # Turn on debug/reload (your app.py already sets debug=True)
+      - FLASK_DEBUG=1
+      # Example for DB (only if you enable the db service below)
+      # - DATABASE_URL=postgresql://flask:flask@db:5432/flaskdb
+    volumes:
+      - .:/app          # live-reload on code changes
+    depends_on:
+      # - db            # uncomment if you enable Postgres below
+      []
+    restart: unless-stopped

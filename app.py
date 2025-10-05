@@ -103,3 +103,7 @@ def end():
     resp = make_response(jsonify({"session_id": sid, "finalized": True}))
     resp.delete_cookie("session_id")
     return resp
+
+if __name__ == "__main__":
+    # Bind to 0.0.0.0 so Docker port mapping works
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
