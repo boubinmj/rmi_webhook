@@ -3,3 +3,4 @@ venv/
 .evn/
 __pycache__/
 *.pyc
+.vscode/
